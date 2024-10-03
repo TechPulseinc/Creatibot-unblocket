@@ -1,0 +1,140 @@
+Blok kódu swift: import UIKit
+
+class ViewController: UIViewController {
+
+    // Vytvoření UI prvků
+    let chatTextView = UITextView()
+    let inputTextField = UITextField()
+    let sendButton = UIButton(type: .system)
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        // Nastavení designu
+        view.backgroundColor = .black
+
+        chatTextView.backgroundColor = .darkGray
+        chatTextView.textColor = .white
+        chatTextView.isEditable = false
+
+        inputTextField.backgroundColor = .white
+        inputTextField.textColor = .black
+        inputTextField.placeholder = "Zadej zprávu..."
+
+        sendButton.setTitle("Odeslat", for: .normal)
+        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
+
+        // Přidání prvků na obrazovku
+        view.addSubview(chatTextView)
+        view.addSubview(inputTextField)
+        view.addSubview(sendButton)
+
+        // Nastavení layoutu
+        chatTextView.frame = CGRect(x: 20, y: 100, width: view.frame.size.width - 40, height: 300)
+        inputTextField.frame = CGRect(x: 20, y: 420, width: view.frame.size.width - 140, height: 40)
+        sendButton.frame = CGRect(x: view.frame.size.width - 100, y: 420, width: 80, height: 40)
+    }
+
+    // Funkce pro zpracování odeslané zprávy
+    @objc func sendMessage() {
+        guard let userInput = inputTextField.text, !userInput.isEmpty else { return }
+        
+        // Přidání zprávy od uživatele do chatu
+        appendMessageToChat("Ty: \(userInput)")
+
+        // Vymazání textového pole
+        inputTextField.text = ""
+
+        // Generování odpovědi od CreativeBota
+        let response = generateCreativeResponse(input: userInput)
+        appendMessageToChat("CreativeBot: \(response)")
+    }
+
+    // Funkce pro přidání zprávy do chatovacího okna
+    func appendMessageToChat(_ message: String) {
+        chatTextView.text.append("\(message)\n")
+    }
+
+    // Funkce pro generování kreativní odpovědi
+    func generateCreativeResponse(input: String) -> String {
+        let ideas = [
+            "Jak bys mohl proměnit tuto myšlenku v něco většího?",
+            "Co kdybychom změnili perspektivu a podívali se na to jinak?",
+            "Zkus si představit, že bys na to měl nekonečné zdroje. Co bys udělal?",
+            "Jaký nečekaný prvek bys mohl přidat, aby to bylo zajímavější?",
+            "Co tě nejvíc inspiruje v tomto nápadu?"
+        ]
+
+        // Náhodně vybere jednu odpověď z kreativních nápadů
+        return ideas.randomElement() ?? "Zkusme přijít na něco zajímavého!"
+    }
+}# CreatiBot pro iOS a mac
+Pomůže s kreativitou, takže naklonujte do pc a a buřte kreativní hned teť
+chatTextView.translatesAutoresizingMaskIntoConstraints = false
+inputTextField.translatesAutoresizingMaskIntoConstraints = false
+sendButton.translatesAutoresizingMaskIntoConstraints = false
+
+NSLayoutConstraint.activate([
+    chatTextView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+    chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+    chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+    chatTextView.heightAnchor.constraint(equalToConstant: 300),
+    
+    inputTextField.topAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: 20),
+    inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+    inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
+    inputTextField.heightAnchor.constraint(equalToConstant: 40),
+    
+    sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+    sendButton.centerYAnchor.constraint(equalTo: inputTextField.centerYAnchor),
+    sendButton.widthAnchor.constraint(equalToConstant: 80),
+    sendButton.heightAnchor.constraint(equalToConstant: 40)
+])
+chatTextView.translatesAutoresizingMaskIntoConstraints = false
+inputTextField.translatesAutoresizingMaskIntoConstraints = false
+sendButton.translatesAutoresizingMaskIntoConstraints = false
+
+NSLayoutConstraint.activate([
+    chatTextView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+    chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+    chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+    chatTextView.heightAnchor.constraint(equalToConstant: 300),
+    
+    inputTextField.topAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: 20),
+    inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+    inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
+    inputTextField.heightAnchor.constraint(equalToConstant: 40),
+    
+    sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+    sendButton.centerYAnchor.constraint(equalTo: inputTextField.centerYAnchor),
+    sendButton.widthAnchor.constraint(equalToConstant: 80),
+    sendButton.heightAnchor.constraint(equalToConstant: 40)
+])
+let chatHistoryKey = "chatHistory"
+
+func saveChatHistory() {
+    UserDefaults.standard.set(chatTextView.text, forKey: chatHistoryKey)
+}
+
+func loadChatHistory() {
+    if let history = UserDefaults.standard.string(forKey: chatHistoryKey) {
+        chatTextView.text = history
+    }
+}
+
+override func viewDidLoad() {
+    super.viewDidLoad()
+    loadChatHistory()
+}
+
+@objc func sendMessage() {
+    // ... Ostatní kód ...
+    saveChatHistory() // Uložení po každé zprávě
+}
+NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
+
+@objc func keyboardWillShow(notification: NSNotification) {
+    if let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+        view.frame.origin.y = -keyboardSize.height
+    }
+}
