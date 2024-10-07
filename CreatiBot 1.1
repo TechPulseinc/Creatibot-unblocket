@@ -1,140 +1,381 @@
-Blok kódu swift: import UIKit
+import UIKit
+import CoreData
 
-class ViewController: UIViewController {
+// MARK: - Message Model
+struct Message: Codable {
+    let text: String
+    let isUser: Bool
+    let timestamp: Date
+    
+    var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp)
+    }
+}
 
-    // Vytvoření UI prvků
-    let chatTextView = UITextView()
-    let inputTextField = UITextField()
-    let sendButton = UIButton(type: .system)
+// MARK: - Response Categories
+enum CreativeCategory: String, CaseIterable {
+    case business = "Byznys"
+    case art = "Umění"
+    case technology = "Technologie"
+    case innovation = "Inovace"
+    
+    var responses: [String] {
+        switch self {
+        case .business:
+            return [
+                "Jak by tento nápad mohl generovat příjem?",
+                "Kdo by byl ideální cílovou skupinou?",
+                "Jaké jsou možnosti škálování tohoto nápadu?"
+            ]
+        case .art:
+            return [
+                "Jak by se dal tento koncept vizuálně vyjádřit?",
+                "Jaké emoce by mělo dílo vyvolávat?",
+                "Jak by se daly kombinovat různé umělecké styly?"
+            ]
+        case .technology:
+            return [
+                "Jaké technologie by mohly tento nápad posunout dál?",
+                "Jak by umělá inteligence mohla pomoct?",
+                "Jaké technické výzvy by bylo třeba překonat?"
+            ]
+        case .innovation:
+            return [
+                "Co kdybychom tento nápad otočili naruby?",
+                "Jak by se dal kombinovat s něčím nečekaným?",
+                "Jaký problém budoucnosti by mohl řešit?"
+            ]
+        }
+    }
+}
 
+class CreativeBotViewController: UIViewController {
+    
+    // MARK: - Properties
+    private let persistentContainer: NSPersistentContainer = {
+        let container = NSPersistentContainer(name: "ChatHistory")
+        container.loadPersistentStores { description, error in
+            if let error = error {
+                print("Core Data failed to load: \(error.localizedDescription)")
+            }
+        }
+        return container
+    }()
+    
+    private var messages: [Message] = []
+    private var selectedCategory: CreativeCategory = .innovation
+    
+    private let themeSwitch: UISwitch = {
+        let switch_ = UISwitch()
+        switch_.addTarget(self, action: #selector(themeSwitchChanged), for: .valueChanged)
+        return switch_
+    }()
+    
+    private lazy var categorySegmentControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: CreativeCategory.allCases.map { $0.rawValue })
+        control.selectedSegmentIndex = 0
+        control.addTarget(self, action: #selector(categoryChanged), for: .valueChanged)
+        return control
+    }()
+    
+    private let chatTextView: UITextView = {
+        let textView = UITextView()
+        textView.backgroundColor = .systemBackground
+        textView.font = .systemFont(ofSize: 16)
+        textView.isEditable = false
+        textView.layer.cornerRadius = 12
+        return textView
+    }()
+    
+    private let inputTextField: UITextField = {
+        let textField = UITextField()
+        textField.backgroundColor = .secondarySystemBackground
+        textField.placeholder = "Zadej zprávu..."
+        textField.layer.cornerRadius = 20
+        textField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 15, height: 0))
+        textField.leftViewMode = .always
+        return textField
+    }()
+    
+    private let sendButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
+        button.tintColor = .systemBlue
+        button.contentVerticalAlignment = .fill
+        button.contentHorizontalAlignment = .fill
+        return button
+    }()
+    
+    private let clearButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Vymazat historii", for: .normal)
+        button.tintColor = .systemRed
+        return button
+    }()
+    
+    private let shareButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+        return button
+    }()
+    
+    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Nastavení designu
-        view.backgroundColor = .black
-
-        chatTextView.backgroundColor = .darkGray
-        chatTextView.textColor = .white
-        chatTextView.isEditable = false
-
-        inputTextField.backgroundColor = .white
-        inputTextField.textColor = .black
-        inputTextField.placeholder = "Zadej zprávu..."
-
-        sendButton.setTitle("Odeslat", for: .normal)
-        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
-
-        // Přidání prvků na obrazovku
-        view.addSubview(chatTextView)
-        view.addSubview(inputTextField)
-        view.addSubview(sendButton)
-
-        // Nastavení layoutu
-        chatTextView.frame = CGRect(x: 20, y: 100, width: view.frame.size.width - 40, height: 300)
-        inputTextField.frame = CGRect(x: 20, y: 420, width: view.frame.size.width - 140, height: 40)
-        sendButton.frame = CGRect(x: view.frame.size.width - 100, y: 420, width: 80, height: 40)
+        setupUI()
+        loadMessages()
+        setupNavigationBar()
+        setupKeyboardObservers()
+        applyCurrentTheme()
     }
-
-    // Funkce pro zpracování odeslané zprávy
-    @objc func sendMessage() {
-        guard let userInput = inputTextField.text, !userInput.isEmpty else { return }
+    
+    // MARK: - UI Setup
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
         
-        // Přidání zprávy od uživatele do chatu
-        appendMessageToChat("Ty: \(userInput)")
-
-        // Vymazání textového pole
+        [categorySegmentControl, chatTextView, inputTextField, sendButton, clearButton, shareButton].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+        
+        setupConstraints()
+        setupActions()
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            categorySegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            categorySegmentControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            categorySegmentControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            
+            chatTextView.topAnchor.constraint(equalTo: categorySegmentControl.bottomAnchor, constant: 20),
+            chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            
+            inputTextField.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
+            inputTextField.heightAnchor.constraint(equalToConstant: 40),
+            
+            sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            sendButton.centerYAnchor.constraint(equalTo: inputTextField.centerYAnchor),
+            sendButton.widthAnchor.constraint(equalToConstant: 40),
+            sendButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            chatTextView.bottomAnchor.constraint(equalTo: inputTextField.topAnchor, constant: -20),
+            
+            clearButton.bottomAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: -10),
+            clearButton.trailingAnchor.constraint(equalTo: chatTextView.trailingAnchor, constant: -10),
+            
+            shareButton.bottomAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: -10),
+            shareButton.trailingAnchor.constraint(equalTo: clearButton.leadingAnchor, constant: -20)
+        ])
+    }
+    
+    private func setupActions() {
+        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
+        clearButton.addTarget(self, action: #selector(clearHistory), for: .touchUpInside)
+        shareButton.addTarget(self, action: #selector(shareChat), for: .touchUpInside)
+        
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    // MARK: - Navigation Bar Setup
+    private func setupNavigationBar() {
+        title = "CreatiBot"
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: themeSwitch)
+    }
+    
+    // MARK: - Theme Handling
+    @objc private func themeSwitchChanged() {
+        if themeSwitch.isOn {
+            overrideUserInterfaceStyle = .dark
+        } else {
+            overrideUserInterfaceStyle = .light
+        }
+        applyCurrentTheme()
+    }
+    
+    private func applyCurrentTheme() {
+        let isDarkMode = traitCollection.userInterfaceStyle == .dark
+        
+        view.backgroundColor = isDarkMode ? .black : .white
+        chatTextView.backgroundColor = isDarkMode ? .darkGray : .white
+        chatTextView.textColor = isDarkMode ? .white : .black
+        inputTextField.backgroundColor = isDarkMode ? .darkGray : .white
+        inputTextField.textColor = isDarkMode ? .white : .black
+        
+        // Uložení preference
+        UserDefaults.standard.set(isDarkMode, forKey: "isDarkMode")
+    }
+    
+    // MARK: - Message Handling
+    @objc private func sendMessage() {
+        guard let text = inputTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return }
+        
+        let userMessage = Message(text: text, isUser: true, timestamp: Date())
+        messages.append(userMessage)
+        
         inputTextField.text = ""
-
-        // Generování odpovědi od CreativeBota
-        let response = generateCreativeResponse(input: userInput)
-        appendMessageToChat("CreativeBot: \(response)")
+        
+        // Animace načítání odpovědi
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let botResponse = self.generateResponse()
+            let botMessage = Message(text: botResponse, isUser: false, timestamp: Date())
+            self.messages.append(botMessage)
+            
+            self.updateChatView()
+            self.saveMessages()
+        }
+        
+        updateChatView()
     }
-
-    // Funkce pro přidání zprávy do chatovacího okna
-    func appendMessageToChat(_ message: String) {
-        chatTextView.text.append("\(message)\n")
+    
+    private func generateResponse() -> String {
+        return selectedCategory.responses.randomElement() ?? "Pojďme to prozkoumat z jiného úhlu!"
     }
-
-    // Funkce pro generování kreativní odpovědi
-    func generateCreativeResponse(input: String) -> String {
-        let ideas = [
-            "Jak bys mohl proměnit tuto myšlenku v něco většího?",
-            "Co kdybychom změnili perspektivu a podívali se na to jinak?",
-            "Zkus si představit, že bys na to měl nekonečné zdroje. Co bys udělal?",
-            "Jaký nečekaný prvek bys mohl přidat, aby to bylo zajímavější?",
-            "Co tě nejvíc inspiruje v tomto nápadu?"
-        ]
-
-        // Náhodně vybere jednu odpověď z kreativních nápadů
-        return ideas.randomElement() ?? "Zkusme přijít na něco zajímavého!"
+    
+    // MARK: - Chat View Updates
+    private func updateChatView() {
+        let attributedText = NSMutableAttributedString()
+        
+        for message in messages {
+            let messageText = NSMutableAttributedString()
+            
+            // Čas
+            let timeString = NSAttributedString(
+                string: "[\(message.formattedTime)] ",
+                attributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.gray]
+            )
+            messageText.append(timeString)
+            
+            // Autor
+            let authorString = NSAttributedString(
+                string: message.isUser ? "Ty: " : "CreatiBot: ",
+                attributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 16),
+                    .foregroundColor: message.isUser ? UIColor.systemBlue : UIColor.systemGreen
+                ]
+            )
+            messageText.append(authorString)
+            
+            // Zpráva
+            let textString = NSAttributedString(
+                string: "\(message.text)\n",
+                attributes: [.font: UIFont.systemFont(ofSize: 16)]
+            )
+            messageText.append(textString)
+            
+            attributedText.append(messageText)
+        }
+        
+        chatTextView.attributedText = attributedText
+        
+        // Scroll na konec
+        let range = NSRange(location: chatTextView.text.count - 1, length: 1)
+        chatTextView.scrollRangeToVisible(range)
     }
-}# CreatiBot pro iOS a mac
-Pomůže s kreativitou, takže naklonujte do pc a a buřte kreativní hned teť
-chatTextView.translatesAutoresizingMaskIntoConstraints = false
-inputTextField.translatesAutoresizingMaskIntoConstraints = false
-sendButton.translatesAutoresizingMaskIntoConstraints = false
-
-NSLayoutConstraint.activate([
-    chatTextView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-    chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-    chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-    chatTextView.heightAnchor.constraint(equalToConstant: 300),
     
-    inputTextField.topAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: 20),
-    inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-    inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
-    inputTextField.heightAnchor.constraint(equalToConstant: 40),
+    // MARK: - Actions
+    @objc private func clearHistory() {
+        let alert = UIAlertController(
+            title: "Vymazat historii",
+            message: "Opravdu chcete vymazat celou historii chatu?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Zrušit", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Vymazat", style: .destructive) { [weak self] _ in
+            self?.messages.removeAll()
+            self?.updateChatView()
+            self?.deleteAllMessages()
+        })
+        
+        present(alert, animated: true)
+    }
     
-    sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-    sendButton.centerYAnchor.constraint(equalTo: inputTextField.centerYAnchor),
-    sendButton.widthAnchor.constraint(equalToConstant: 80),
-    sendButton.heightAnchor.constraint(equalToConstant: 40)
-])
-chatTextView.translatesAutoresizingMaskIntoConstraints = false
-inputTextField.translatesAutoresizingMaskIntoConstraints = false
-sendButton.translatesAutoresizingMaskIntoConstraints = false
-
-NSLayoutConstraint.activate([
-    chatTextView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-    chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-    chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-    chatTextView.heightAnchor.constraint(equalToConstant: 300),
+    @objc private func shareChat() {
+        let text = messages.map { "[\($0.formattedTime)] \($0.isUser ? "Ty" : "CreatiBot"): \($0.text)" }
+            .joined(separator: "\n")
+        
+        let activityViewController = UIActivityViewController(
+            activityItems: [text],
+            applicationActivities: nil
+        )
+        
+        present(activityViewController, animated: true)
+    }
     
-    inputTextField.topAnchor.constraint(equalTo: chatTextView.bottomAnchor, constant: 20),
-    inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-    inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
-    inputTextField.heightAnchor.constraint(equalToConstant: 40),
+    @objc private func categoryChanged() {
+        selectedCategory = CreativeCategory.allCases[categorySegmentControl.selectedSegmentIndex]
+    }
     
-    sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-    sendButton.centerYAnchor.constraint(equalTo: inputTextField.centerYAnchor),
-    sendButton.widthAnchor.constraint(equalToConstant: 80),
-    sendButton.heightAnchor.constraint(equalToConstant: 40)
-])
-let chatHistoryKey = "chatHistory"
-
-func saveChatHistory() {
-    UserDefaults.standard.set(chatTextView.text, forKey: chatHistoryKey)
+    // MARK: - Core Data
+    private func saveMessages() {
+        let context = persistentContainer.viewContext
+        
+        do {
+            // Smazání starých zpráv
+            let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "ChatMessage")
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+            try context.execute(deleteRequest)
+            
+            // Uložení nových zpráv
+            for message in messages {
+                let chatMessage = NSEntityDescription.insertNewObject(forEntityName: "ChatMessage", into: context)
+                chatMessage.setValue(message.text, forKey: "text")
+                chatMessage.setValue(message.isUser, forKey: "isUser")
+                chatMessage.setValue(message.timestamp, forKey: "timestamp")
+            }
+            
+            try context.save()
+        } catch {
+            print("Failed to save messages: \(error)")
+        }
+    }
+    
+    private func loadMessages() {
+        let context = persistentContainer.viewContext
+        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "ChatMessage")
+        
+        do {
+            let results = try context.fetch(fetchRequest)
+            messages = results.compactMap { result in
+                guard let message = result as? NSManagedObject else { return nil }
+                return Message(
+                    text: message.value(forKey: "text") as? String ?? "",
+                    isUser: message.value(forKey: "isUser") as? Bool ?? false,
+                    timestamp: message.value(forKey: "timestamp") as? Date ?? Date()
+                )
+            }
+            updateChatView()
+        } catch {
+            print("Failed to load messages: \(error)")
+        }
+    }
+    
+    private func deleteAllMessages() {
+        let context = persistentContainer.viewContext
+        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "ChatMessage")
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        
+        do {
+            try context.execute(deleteRequest)
+            try context.save()
+        } catch {
+            print("Failed to delete messages: \(error)")
+        }
+    }
 }
 
-func loadChatHistory() {
-    if let history = UserDefaults.standard.string(forKey: chatHistoryKey) {
-        chatTextView.text = history
-    }
-}
-
-override func viewDidLoad() {
-    super.viewDidLoad()
-    loadChatHistory()
-}
-
-@objc func sendMessage() {
-    // ... Ostatní kód ...
-    saveChatHistory() // Uložení po každé zprávě
-}
-NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
-
-@objc func keyboardWillShow(notification: NSNotification) {
-    if let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
-        view.frame.origin.y = -keyboardSize.height
+// MARK: - UITextFieldDelegate
+extension CreativeBotViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        sendMessage()
+        return true
     }
 }
