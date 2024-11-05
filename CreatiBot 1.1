@@ -146,8 +146,7 @@ class CreativeBotViewController: UIViewController {
     
     private func setupConstraints() {
         NSLayoutConstraint.activate([
-            categorySegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
-            categorySegmentControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            categorySegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10), categorySegmentControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             categorySegmentControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
             chatTextView.topAnchor.constraint(equalTo: categorySegmentControl.bottomAnchor, constant: 20),
@@ -225,10 +224,7 @@ class CreativeBotViewController: UIViewController {
         // Animace načítání odpovědi
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let botResponse = self.generateResponse()
-            let botMessage = Message(text: botResponse, isUser: false, timestamp: Date())
-            self.messages.append(botMessage)
-            
-            self.updateChatView()
+            let botMessage = Message(text: botResponse, isUser: false, timestamp: Date()) self.messages.append(botMessage) self.updateChatView()
             self.saveMessages()
         }
         
@@ -255,8 +251,7 @@ class CreativeBotViewController: UIViewController {
             
             // Autor
             let authorString = NSAttributedString(
-                string: message.isUser ? "Ty: " : "CreatiBot: ",
-                attributes: [
+                string: message.isUser ? "Ty: " : "CreatiBot: ", attributes: [
                     .font: UIFont.boldSystemFont(ofSize: 16),
                     .foregroundColor: message.isUser ? UIColor.systemBlue : UIColor.systemGreen
                 ]
@@ -284,8 +279,7 @@ class CreativeBotViewController: UIViewController {
     @objc private func clearHistory() {
         let alert = UIAlertController(
             title: "Vymazat historii",
-            message: "Opravdu chcete vymazat celou historii chatu?",
-            preferredStyle: .alert
+            message: "Opravdu chcete vymazat celou historii chatu?", preferredStyle: .alert
         )
         
         alert.addAction(UIAlertAction(title: "Zrušit", style: .cancel))
@@ -312,9 +306,7 @@ class CreativeBotViewController: UIViewController {
     
     @objc private func categoryChanged() {
         selectedCategory = CreativeCategory.allCases[categorySegmentControl.selectedSegmentIndex]
-    }
-    
-    // MARK: - Core Data
+    } // MARK: - Core Data
     private func saveMessages() {
         let context = persistentContainer.viewContext
         
@@ -491,8 +483,7 @@ class CreativeBotViewController: UIViewController {
     
     @objc private func fontSizeChanged() {
         switch fontSizeSegmentControl.selectedSegmentIndex {
-        case 0:
-            fontSize = 14
+        case 0: fontSize = 14
         case 1:
             fontSize = 16
         case 2:
@@ -522,8 +513,7 @@ class CreativeBotViewController: UIViewController {
         saveMessages()
         
         // Generate bot response
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let botResponse = self.generateResponse()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { let botResponse = self.generateResponse()
             let botMessage = Message(text: botResponse, isUser: false, timestamp: Date())
             self.messages.append(botMessage)
             self.updateChatView()
@@ -545,8 +535,7 @@ class CreativeBotViewController: UIViewController {
         
         for message in messages {
             let messageText = NSMutableAttributedString()
-            let timeString = NSAttributedString(string: "[\(message.formattedTime)] ", attributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.gray])
-            messageText.append(timeString)
+            let timeString = NSAttributedString(string: "[\(message.formattedTime)] ", attributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.gray]) messageText.append(timeString)
             
             let authorString = NSAttributedString(string: message.isUser ? "Ty: " : "CreatiBot: ", attributes: [.font: UIFont.boldSystemFont(ofSize: 16), .foregroundColor: message.isUser ? UIColor.systemBlue : UIColor.systemGreen])
             messageText.append(authorString)
@@ -577,4 +566,50 @@ class CreativeBotViewController: UIViewController {
     }
     
     // Add other functionalities here...
+}        // Layout constraints pro chatTextView, inputTextField a fontSizeSegmentControl
+        chatTextView.translatesAutoresizingMaskIntoConstraints = false
+        inputTextField.translatesAutoresizingMaskIntoConstraints = false
+        fontSizeSegmentControl.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            chatTextView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            chatTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            chatTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            chatTextView.bottomAnchor.constraint(equalTo: inputTextField.topAnchor, constant: -10),
+            
+            inputTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            inputTextField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+           inputTextField.bottomAnchor.constraint(equalTo: fontSizeSegmentControl.topAnchor, constant: -10),
+            inputTextField.heightAnchor.constraint(equalToConstant: 40),
+            
+            fontSizeSegmentControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            fontSizeSegmentControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            fontSizeSegmentControl.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10)
+        ])
+    }
+    
+    // MARK: - Actions Setup
+    private func setupActions() {
+        fontSizeSegmentControl.addTarget(self, action: #selector(fontSizeChanged), for: .valueChanged)
+    }
+
+    // MARK: - Font Size Handler
+    @objc private func fontSizeChanged() {
+        switch fontSizeSegmentControl.selectedSegmentIndex {
+        case 0:
+            fontSize = 14 // Malé
+        case 1:
+            fontSize = 16 // Střední
+        case 2:
+            fontSize = 20 // Velké
+        default:
+            fontSize = 16
+        }
+        
+        updateFontSize()
+    }
+
+    private func updateFontSize() {
+        chatTextView.font = .systemFont(ofSize: fontSize)
+    }
 }
