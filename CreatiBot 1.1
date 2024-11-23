@@ -189,4 +189,78 @@ class CreativeBotViewController: UIViewController {
             print("Failed to load messages: \(error)")
         }
     }
-}
+}    // MARK: - New Features
+
+    // Implementace mazání zpráv
+    @objc private func deleteMessages() {
+        let context = persistentContainer.viewContext
+        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "ChatMessage")
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        
+        do {
+            try context.execute(deleteRequest)
+            messages.removeAll()
+            updateChatView()
+        } catch {
+            print("Failed to delete messages: \(error)")
+        }
+    }
+
+    // Přidání vyhledávání ve zprávách
+    private func searchMessages(query: String) -> [Message] {
+        return messages.filter { $0.text.localizedCaseInsensitiveContains(query) }
+    }
+
+    // Přidání tlačítka pro vyhledávání
+    private let searchButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Hledat", for: .normal)
+        button.addTarget(self, action: #selector(promptSearch), for: .touchUpInside)
+        return button
+    }()
+
+    @objc private func promptSearch() {
+        let alert = UIAlertController(title: "Hledat", message: "Zadejte klíčové slovo", preferredStyle: .alert)
+        alert.addTextField()
+        let searchAction = UIAlertAction(title: "Hledat", style: .default) { [weak self] _ in
+            guard let query = alert.textFields?.first?.text, !query.isEmpty else { return }
+            let results = self?.searchMessages(query: query)
+            self?.displaySearchResults(results ?? [])
+        }
+        let cancelAction = UIAlertAction(title: "Zrušit", style: .cancel)
+        alert.addAction(searchAction)
+        alert.addAction(cancelAction)
+        present(alert, animated: true)
+    }
+
+    private func displaySearchResults(_ results: [Message]) {
+        let resultText = results.map { "\($0.formattedTime): \($0.text)" }.joined(separator: "\n")
+        let alert = UIAlertController(title: "Výsledky hledání", message: resultText.isEmpty ? "Nic nenalezeno" : resultText, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    // Přidání přepínání režimu světlý/tmavý
+    @objc private func themeSwitchChanged() {
+        overrideUserInterfaceStyle = themeSwitch.isOn ? .dark : .light
+    }
+
+    // Aktualizace UI pro nové funkce
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
+        
+        view.addSubview(categorySegmentControl)
+        view.addSubview(chatTextView)
+        view.addSubview(inputTextField)
+        view.addSubview(sendButton)
+        view.addSubview(themeSwitch)
+        view.addSubview(searchButton)
+
+        // Nastavení rozvržení
+        categorySegmentControl.frame = CGRect(x: 20, y: 100, width: view.frame.width - 40, height: 40)
+        chatTextView.frame = CGRect(x: 20, y: 150, width: view.frame.width - 40, height: 400)
+        inputTextField.frame = CGRect(x: 20, y: 570, width: view.frame.width - 100, height: 40)
+        sendButton.frame = CGRect(x: view.frame.width - 60, y: 570, width: 40, height: 40)
+        themeSwitch.frame = CGRect(x: 20, y: 630, width: 100, height: 40)
+        searchButton.frame = CGRect(x: view.frame.width - 120, y: 630, width: 100, height: 40)
+    }
